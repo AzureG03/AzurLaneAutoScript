@@ -7,6 +7,7 @@ from module.logger import logger
 from module.retire.assets import TEMPLATE_BOGUE, TEMPLATE_HERMES, TEMPLATE_RANGER, TEMPLATE_LANGLEY
 from module.storage.assets import EQUIPMENT_FULL
 from module.storage.storage import StorageHandler
+from toolkit.Lib import subprocess
 
 EMPTY_CODE = "MC8wLzAvMC8wXDA="
 U2_CONTROL_METHODS = {'uiautomator2', 'minitouch', 'MaaTouch'}
@@ -188,9 +189,6 @@ class EquipmentCodeHandler(StorageHandler):
         click_timer = Timer(1, count=3)
         for _ in self.loop():
             name, shown = d.current_ime()
-            if name != self.FASTINPUT_IME:
-                self.set_fastinput_ime()
-                continue
             if shown:
                 break
             if click_timer.reached_and_reset():
@@ -198,13 +196,12 @@ class EquipmentCodeHandler(StorageHandler):
         else:
             logger.warning("Equipment code load failed")
             return False
-        d.send_keys(text=code, clear=True)
-        d.send_action(code="done")
+        self.device.adb_shell(['input', 'text', code])
         self.device.sleep((0.3, 0.5))
         for _ in self.loop(timeout=10, skip_first=False):
             _, shown = d.current_ime()
             if shown:
-                continue
+                self.device.click(EQUIPMENT_CODE_ENTRANCE)
             if self.is_code_preview_loaded():
                 return True
             if self.appear_then_click(EQUIPMENT_CODE_ENTER, offset=(5, 5), interval=3):
@@ -245,14 +242,12 @@ class EquipmentCodeHandler(StorageHandler):
 
     def _code_export(self):
         self.handle_info_bar()
-        d = self.device.u2
-        self.set_fastinput_ime()
         for _ in self.loop(timeout=10):
             if self.info_bar_count():
                 break
             if self.appear_then_click(EQUIPMENT_CODE_EXPORT, offset=(5, 5), interval=3):
                 continue
-        code = d.clipboard
+        code = subprocess.check_output(["powershell", "Get-Clipboard"], text=True).strip()
         return code
 
     def code_clear(self, name=None):
